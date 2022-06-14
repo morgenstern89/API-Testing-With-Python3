@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <style>body {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  /* do not increase min-width as some may use split screens */
+  min-width: 800px;
+  color: #999;
+}
+
+h1 {
+  font-size: 24px;
+  color: black;
+}
+
+h2 {
+  font-size: 16px;
+  color: black;
+}
+
+p {
+  color: black;
+}
+
+a {
+  color: #999;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+#environment td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+}
+#environment tr:nth-child(odd) {
+  background-color: #f6f6f6;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed,
+.passed .col-result {
+  color: green;
+}
+
+span.skipped,
+span.xfailed,
+span.rerun,
+.skipped .col-result,
+.xfailed .col-result,
+.rerun .col-result {
+  color: orange;
+}
+
+span.error,
+span.failed,
+span.xpassed,
+.error .col-result,
+.failed .col-result,
+.xpassed .col-result {
+  color: red;
+}
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+#results-table {
+  border: 1px solid #e6e6e6;
+  color: #999;
+  font-size: 12px;
+  width: 100%;
+}
+#results-table th,
+#results-table td {
+  padding: 5px;
+  border: 1px solid #E6E6E6;
+  text-align: left;
+}
+#results-table th {
+  font-weight: bold;
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+.log {
+  background-color: #e6e6e6;
+  border: 1px solid #e6e6e6;
+  color: black;
+  display: block;
+  font-family: "Courier New", Courier, monospace;
+  height: 230px;
+  overflow-y: scroll;
+  padding: 5px;
+  white-space: pre-wrap;
+}
+.log:only-child {
+  height: inherit;
+}
+
+div.image {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.image img {
+  width: 320px;
+}
+
+div.video {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin-left: 5px;
+  overflow: hidden;
+  width: 320px;
+}
+div.video video {
+  overflow: hidden;
+  width: 320px;
+  height: 240px;
+}
+
+.collapsed {
+  display: none;
+}
+
+.expander::after {
+  content: " (show details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.collapser::after {
+  content: " (hide details)";
+  color: #BBB;
+  font-style: italic;
+  cursor: pointer;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+  cursor: pointer;
+}
+
+.sort-icon {
+  font-size: 0px;
+  float: left;
+  margin-right: 5px;
+  margin-top: 5px;
+  /*triangle*/
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+}
+.inactive .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #E6E6E6;
+}
+.asc.active .sort-icon {
+  /*finish triangle*/
+  border-bottom: 8px solid #999;
+}
+.desc.active .sort-icon {
+  /*finish triangle*/
+  border-top: 8px solid #999;
+}
+</style></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) { // eslint-disable-line no-redeclare
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function findAll(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sortColumn(elem) {
+    toggleSortStates(elem);
+    const colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    let key;
+    if (elem.classList.contains('result')) {
+        key = keyResult;
+    } else if (elem.classList.contains('links')) {
+        key = keyLink;
+    } else {
+        key = keyAlpha;
+    }
+    sortTable(elem, key(colIndex));
+}
+
+function showAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(showExtras);
+}
+
+function hideAllExtras() { // eslint-disable-line no-unused-vars
+    findAll('.col-result').forEach(hideExtras);
+}
+
+function showExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.remove('collapsed');
+    expandcollapse.classList.remove('expander');
+    expandcollapse.classList.add('collapser');
+}
+
+function hideExtras(colresultElem) {
+    const extras = colresultElem.parentNode.nextElementSibling;
+    const expandcollapse = colresultElem.firstElementChild;
+    extras.classList.add('collapsed');
+    expandcollapse.classList.remove('collapser');
+    expandcollapse.classList.add('expander');
+}
+
+function showFilters() {
+    const filterItems = document.getElementsByClassName('filter');
+    for (let i = 0; i < filterItems.length; i++)
+        filterItems[i].hidden = false;
+}
+
+function addCollapse() {
+    // Add links for show/hide all
+    const resulttable = find('table#results-table');
+    const showhideall = document.createElement('p');
+    showhideall.innerHTML = '<a href="javascript:showAllExtras()">Show all details</a> / ' +
+                            '<a href="javascript:hideAllExtras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    findAll('.col-result').forEach(function(elem) {
+        const collapsed = getQueryParameter('collapsed') || 'Passed';
+        const extras = elem.parentNode.nextElementSibling;
+        const expandcollapse = document.createElement('span');
+        if (extras.classList.contains('collapsed')) {
+            expandcollapse.classList.add('expander');
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add('collapsed');
+            expandcollapse.classList.add('expander');
+        } else {
+            expandcollapse.classList.add('collapser');
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener('click', function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains('collapsed')) {
+                showExtras(event.currentTarget);
+            } else {
+                hideExtras(event.currentTarget);
+            }
+        });
+    });
+}
+
+function getQueryParameter(name) {
+    const match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () { // eslint-disable-line no-unused-vars
+    resetSortHeaders();
+
+    addCollapse();
+
+    showFilters();
+
+    sortColumn(find('.initial-sort'));
+
+    findAll('.sortable').forEach(function(elem) {
+        elem.addEventListener('click',
+            function() {
+                sortColumn(elem);
+            }, false);
+    });
+}
+
+function sortTable(clicked, keyFunc) {
+    const rows = findAll('.results-table-row');
+    const reversed = !clicked.classList.contains('asc');
+    const sortedRows = sort(rows, keyFunc, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    const thead = document.getElementById('results-table-head');
+    document.getElementById('results-table').remove();
+    const parent = document.createElement('table');
+    parent.id = 'results-table';
+    parent.appendChild(thead);
+    sortedRows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName('BODY')[0].appendChild(parent);
+}
+
+function sort(items, keyFunc, reversed) {
+    const sortArray = items.map(function(item, i) {
+        return [keyFunc(item), i];
+    });
+
+    sortArray.sort(function(a, b) {
+        const keyA = a[0];
+        const keyB = b[0];
+
+        if (keyA == keyB) return 0;
+
+        if (reversed) {
+            return keyA < keyB ? 1 : -1;
+        } else {
+            return keyA > keyB ? 1 : -1;
+        }
+    });
+
+    return sortArray.map(function(item) {
+        const index = item[1];
+        return items[index];
+    });
+}
+
+function keyAlpha(colIndex) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[colIndex].firstChild.data.toLowerCase();
+    };
+}
+
+function keyLink(colIndex) {
+    return function(elem) {
+        const dataCell = elem.childNodes[1].childNodes[colIndex].firstChild;
+        return dataCell == null ? '' : dataCell.innerText.toLowerCase();
+    };
+}
+
+function keyResult(colIndex) {
+    return function(elem) {
+        const strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+            'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[colIndex].firstChild.data);
+    };
+}
+
+function resetSortHeaders() {
+    findAll('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    findAll('.sortable').forEach(function(elem) {
+        const icon = document.createElement('div');
+        icon.className = 'sort-icon';
+        icon.textContent = 'vvv';
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove('desc', 'active');
+        elem.classList.add('asc', 'inactive');
+    });
+}
+
+function toggleSortStates(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        resetSortHeaders();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function isAllRowsHidden(value) {
+    return value.hidden == false;
+}
+
+function filterTable(elem) { // eslint-disable-line no-unused-vars
+    const outcomeAtt = 'data-test-result';
+    const outcome = elem.getAttribute(outcomeAtt);
+    const classOutcome = outcome + ' results-table-row';
+    const outcomeRows = document.getElementsByClassName(classOutcome);
+
+    for(let i = 0; i < outcomeRows.length; i++){
+        outcomeRows[i].hidden = !elem.checked;
+    }
+
+    const rows = findAll('.results-table-row').filter(isAllRowsHidden);
+    const allRowsHidden = rows.length == 0 ? true : false;
+    const notFoundMessage = document.getElementById('not-found-message');
+    notFoundMessage.hidden = !allRowsHidden;
+}
+</script>
+    <h1>{products_report}.html</h1>
+    <p>Report generated on 14-Jun-2022 at 19:00:15 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v3.1.1</p>
+    <h2>Summary</h2>
+    <p>5 tests ran in 10.00 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="passed">5 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="failed">0 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filterTable(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable" col="duration">Duration</th>
+          <th class="sortable links" col="links">Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test/products/test_create_simple_product_smoke.py::test_create_simple_product</td>
+          <td class="col-duration">1.79</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [POST]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;53920181738411142021655226006&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226006&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=53920181738411142021655226006&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226006&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: POST&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D53920181738411142021655226006%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226006%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: JCRGoPwS2NQ4kWWADSse1cw20uE=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;76&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;53920181738411142021655226006&quot;, oauth_timestamp=&quot;1655226006&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;JCRGoPwS2NQ4kWWADSse1cw20uE%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;{&quot;name&quot;: &quot;ocrzmavstrbciidhieda&quot;, &quot;type&quot;: &quot;simple&quot;, &quot;regular_price&quot;: &quot;10.99&quot;}&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;POST /apidemo/wp-json/wc/v3/products HTTP/1.1&quot; 201 807
+DEBUG    root:requestsUtilities.py:39 POST API response: {&#x27;id&#x27;: 185, &#x27;name&#x27;: &#x27;ocrzmavstrbciidhieda&#x27;, &#x27;slug&#x27;: &#x27;ocrzmavstrbciidhieda&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/ocrzmavstrbciidhieda/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T17:00:07&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T17:00:07&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T17:00:07&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T17:00:07&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;10.99&#x27;, &#x27;regular_price&#x27;: &#x27;10.99&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;10.99&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [64, 59, 175, 63, 174], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/185&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}
+DEBUG    root:dbUtility.py:53 Executing: SELECT * FROM wp407.wpi_posts WHERE ID= 185;<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test/products/test_get_products_smoke.py::test_get_all_products</td>
+          <td class="col-duration">0.89</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [GET]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;144053902867508421751655226007&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226007&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=144053902867508421751655226007&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226007&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: GET&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D144053902867508421751655226007%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226007%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: 1TQ34OxC6kuiL2O690+qiUr063A=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;4&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;144053902867508421751655226007&quot;, oauth_timestamp=&quot;1655226007&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;1TQ34OxC6kuiL2O690%2BqiUr063A%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;null&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;GET /apidemo/wp-json/wc/v3/products HTTP/1.1&quot; 200 1585
+DEBUG    root:requestsUtilities.py:57 GET API response: [{&#x27;id&#x27;: 185, &#x27;name&#x27;: &#x27;ocrzmavstrbciidhieda&#x27;, &#x27;slug&#x27;: &#x27;ocrzmavstrbciidhieda&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/ocrzmavstrbciidhieda/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T17:00:07&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T17:00:07&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T17:00:07&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T17:00:07&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;10.99&#x27;, &#x27;regular_price&#x27;: &#x27;10.99&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;10.99&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [63, 59, 64, 60, 175], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/185&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}, {&#x27;id&#x27;: 184, &#x27;name&#x27;: &#x27;bhfthizyudapgrjrvjrs&#x27;, &#x27;slug&#x27;: &#x27;bhfthizyudapgrjrvjrs&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/bhfthizyudapgrjrvjrs/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T16:58:20&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T16:58:20&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T16:58:22&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T16:58:22&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;46.65&#x27;, &#x27;regular_price&#x27;: &#x27;46.65&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;46.65&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [175, 183, 64, 60, 166], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/184&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}, {&#x27;id&#x27;: 183, &#x27;name&#x27;: &#x27;nmtpwdhupznqlaxwunqi&#x27;, &#x27;slug&#x27;: &#x27;nmtpwdhupznqlaxwunqi&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/nmtpwdhupznqlaxwunqi/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T16:58:15&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T16:58:15&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T16:58:15&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T16:58:15&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;10.99&#x27;, &#x27;regular_price&#x27;: &#x27;10.99&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;10.99&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [177, 166, 174, 175, 178], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/183&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}, {&#x27;id&#x27;: 182, &#x27;name&#x27;: &#x27;njdpxgmzoskkumbgfudu&#x27;, &#x27;slug&#x27;: &#x27;njdpxgmzoskkumbgfudu&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/njdpxgmzoskkumbgfudu/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T16:57:15&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T16:57:15&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T16:57:18&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T16:57:18&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;19.87&#x27;, &#x27;regular_price&#x27;: &#x27;19.87&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;19.87&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [175, 64, 59, 181, 174], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/182&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}, {&#x27;id&#x27;: 181, &#x27;name&#x27;: &#x27;lduqkgmaxissdybybfag&#x27;, &#x27;slug&#x27;: &#x27;lduqkgmaxissdybybfag&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/lduqkgmaxissdybybfag/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T16:57:10&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T16:57:10&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T16:57:10&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T16:57:10&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;10.99&#x27;, &#x27;regular_price&#x27;: &#x27;10.99&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;10.99&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [59, 180, 166, 175, 61], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/181&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}, {&#x27;id&#x27;: 180, &#x27;name&#x27;: &#x27;pevfmhklrefqrfowtiev&#x27;, &#x27;slug&#x27;: &#x27;pevfmhklrefqrfowtiev&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/pevfmhklrefqrfowtiev/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T16:55:35&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T16:55:35&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T16:55:37&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T16:55:37&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;63.16&#x27;, &#x27;regular_price&#x27;: &#x27;63.16&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;63.16&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [62, 174, 64, 175, 176], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/180&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}, {&#x27;id&#x27;: 179, &#x27;name&#x27;: &#x27;kicgkvsakkrgzxlacuet&#x27;, &#x27;slug&#x27;: &#x27;kicgkvsakkrgzxlacuet&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/kicgkvsakkrgzxlacuet/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T16:55:31&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T16:55:31&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T16:55:31&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T16:55:31&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;10.99&#x27;, &#x27;regular_price&#x27;: &#x27;10.99&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;10.99&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [59, 178, 166, 175, 62], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/179&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}, {&#x27;id&#x27;: 178, &#x27;name&#x27;: &#x27;blxtuzptdtldaiezhkgg&#x27;, &#x27;slug&#x27;: &#x27;blxtuzptdtldaiezhkgg&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/blxtuzptdtldaiezhkgg/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T16:54:55&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T16:54:55&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T16:54:58&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T16:54:58&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;23.50&#x27;, &#x27;regular_price&#x27;: &#x27;23.50&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;23.50&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [166, 174, 64, 177, 63], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/178&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}, {&#x27;id&#x27;: 177, &#x27;name&#x27;: &#x27;pnyazfcnxumqqkoosqpu&#x27;, &#x27;slug&#x27;: &#x27;pnyazfcnxumqqkoosqpu&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/pnyazfcnxumqqkoosqpu/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T16:54:12&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T16:54:12&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T16:54:15&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T16:54:15&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;34.68&#x27;, &#x27;regular_price&#x27;: &#x27;34.68&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;34.68&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [60, 174, 63, 175, 62], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/177&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}, {&#x27;id&#x27;: 176, &#x27;name&#x27;: &#x27;zgheldyfyrvpvmxudggu&#x27;, &#x27;slug&#x27;: &#x27;zgheldyfyrvpvmxudggu&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/zgheldyfyrvpvmxudggu/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T16:53:34&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T16:53:34&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T16:53:36&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T16:53:36&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;84.80&#x27;, &#x27;regular_price&#x27;: &#x27;84.80&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;84.80&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [175, 64, 60, 61, 174], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/176&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}]<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test/products/test_get_products_smoke.py::test_get_products_by_id</td>
+          <td class="col-duration">0.78</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>DEBUG    root:dbUtility.py:53 Executing: SELECT * FROM wp407.wpi_posts 
+                WHERE post_type=&quot;product&quot; LIMIT 5000;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [GET]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;172233901906193297301655226008&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226008&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=172233901906193297301655226008&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226008&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/62
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: GET&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts%2F62&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D172233901906193297301655226008%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226008%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: eNNNDLPpDpunbCasvJI6ZulMXXs=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/62
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;4&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;172233901906193297301655226008&quot;, oauth_timestamp=&quot;1655226008&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;eNNNDLPpDpunbCasvJI6ZulMXXs%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;null&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;GET /apidemo/wp-json/wc/v3/products/62 HTTP/1.1&quot; 200 812
+DEBUG    root:requestsUtilities.py:57 GET API response: {&#x27;id&#x27;: 62, &#x27;name&#x27;: &#x27;tbumylzdjgxytgchtfph&#x27;, &#x27;slug&#x27;: &#x27;tbumylzdjgxytgchtfph&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/tbumylzdjgxytgchtfph/&#x27;, &#x27;date_created&#x27;: &#x27;2022-05-31T21:30:53&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-05-31T21:30:53&#x27;, &#x27;date_modified&#x27;: &#x27;2022-05-31T21:30:53&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-05-31T21:30:53&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;10.99&#x27;, &#x27;regular_price&#x27;: &#x27;10.99&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 1, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;10.99&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [63, 64, 59, 60, 175], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/62&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test/products/test_update_product_regular_price.py::test_update_regular_price</td>
+          <td class="col-duration">2.25</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>DEBUG    root:dbUtility.py:53 Executing: SELECT * FROM wp407.wpi_posts 
+                WHERE post_type=&quot;product&quot; LIMIT 5000;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [GET]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;40533477632051434451655226009&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226009&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=40533477632051434451655226009&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226009&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/22
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: GET&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts%2F22&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D40533477632051434451655226009%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226009%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: rL/luMoUBUmp5OZjj1XnfXvVg98=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/22
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;4&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;40533477632051434451655226009&quot;, oauth_timestamp=&quot;1655226009&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;rL%2FluMoUBUmp5OZjj1XnfXvVg98%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;null&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;GET /apidemo/wp-json/wc/v3/products/22 HTTP/1.1&quot; 200 1105
+DEBUG    root:requestsUtilities.py:57 GET API response: {&#x27;id&#x27;: 22, &#x27;name&#x27;: &#x27;Long Sleeve Tee&#x27;, &#x27;slug&#x27;: &#x27;long-sleeve-tee&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/long-sleeve-tee/&#x27;, &#x27;date_created&#x27;: &#x27;2019-01-16T13:01:53&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2019-01-16T13:01:53&#x27;, &#x27;date_modified&#x27;: &#x27;2019-01-16T13:01:53&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2019-01-16T13:01:53&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&lt;p&gt;Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Vestibulum tortor quam, feugiat vitae, ultricies eget, tempor sit amet, ante. Donec eu libero sit amet quam egestas semper. Aenean ultricies mi vitae est. Mauris placerat eleifend leo.&lt;/p&gt;\n&#x27;, &#x27;short_description&#x27;: &#x27;&lt;p&gt;This is a simple product.&lt;/p&gt;\n&#x27;, &#x27;sku&#x27;: &#x27;woo-long-sleeve-tee&#x27;, &#x27;price&#x27;: &#x27;25&#x27;, &#x27;regular_price&#x27;: &#x27;25&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 1, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: 0, &#x27;download_expiry&#x27;: 0, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;1&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;7&#x27;, &#x27;width&#x27;: &#x27;5&#x27;, &#x27;height&#x27;: &#x27;1&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 22, &#x27;name&#x27;: &#x27;Tshirts&#x27;, &#x27;slug&#x27;: &#x27;tshirts&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [{&#x27;id&#x27;: 51, &#x27;date_created&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;date_modified&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;src&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-content/uploads/2019/01/long-sleeve-tee-2-1.jpg&#x27;, &#x27;name&#x27;: &#x27;long-sleeve-tee-2.jpg&#x27;, &#x27;alt&#x27;: &#x27;&#x27;}], &#x27;attributes&#x27;: [{&#x27;id&#x27;: 1, &#x27;name&#x27;: &#x27;color&#x27;, &#x27;position&#x27;: 0, &#x27;visible&#x27;: True, &#x27;variation&#x27;: False, &#x27;options&#x27;: [&#x27;Green&#x27;]}], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;25.00&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [32, 15, 23, 12], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/22&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [PUT]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;172327834587422465911655226010&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226010&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=172327834587422465911655226010&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226010&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/22
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: PUT&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts%2F22&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D172327834587422465911655226010%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226010%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: ggjuOq30nqQ0RK5o6hmKX6gBVtY=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/22
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;26&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;172327834587422465911655226010&quot;, oauth_timestamp=&quot;1655226010&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;ggjuOq30nqQ0RK5o6hmKX6gBVtY%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;{&quot;regular_price&quot;: &quot;63.93&quot;}&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;PUT /apidemo/wp-json/wc/v3/products/22 HTTP/1.1&quot; 200 1110
+DEBUG    root:requestsUtilities.py:74 PUT API response: {&#x27;id&#x27;: 22, &#x27;name&#x27;: &#x27;Long Sleeve Tee&#x27;, &#x27;slug&#x27;: &#x27;long-sleeve-tee&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/long-sleeve-tee/&#x27;, &#x27;date_created&#x27;: &#x27;2019-01-16T13:01:53&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2019-01-16T13:01:53&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T17:00:11&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T17:00:11&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Vestibulum tortor quam, feugiat vitae, ultricies eget, tempor sit amet, ante. Donec eu libero sit amet quam egestas semper. Aenean ultricies mi vitae est. Mauris placerat eleifend leo.&#x27;, &#x27;short_description&#x27;: &#x27;This is a simple product.&#x27;, &#x27;sku&#x27;: &#x27;woo-long-sleeve-tee&#x27;, &#x27;price&#x27;: &#x27;63.93&#x27;, &#x27;regular_price&#x27;: &#x27;63.93&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 1, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: 0, &#x27;download_expiry&#x27;: 0, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;1&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;7&#x27;, &#x27;width&#x27;: &#x27;5&#x27;, &#x27;height&#x27;: &#x27;1&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 22, &#x27;name&#x27;: &#x27;Tshirts&#x27;, &#x27;slug&#x27;: &#x27;tshirts&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [{&#x27;id&#x27;: 51, &#x27;date_created&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;date_modified&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;src&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-content/uploads/2019/01/long-sleeve-tee-2-1.jpg&#x27;, &#x27;name&#x27;: &#x27;long-sleeve-tee-2.jpg&#x27;, &#x27;alt&#x27;: &#x27;&#x27;}], &#x27;attributes&#x27;: [{&#x27;id&#x27;: 1, &#x27;name&#x27;: &#x27;color&#x27;, &#x27;position&#x27;: 0, &#x27;visible&#x27;: True, &#x27;variation&#x27;: False, &#x27;options&#x27;: [&#x27;Green&#x27;]}], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;63.93&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [32, 12, 23, 15], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/22&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [GET]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;32586791717973114331655226011&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226011&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=32586791717973114331655226011&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226011&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/22
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: GET&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts%2F22&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D32586791717973114331655226011%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226011%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: +GygKhqQ96g8IPjQw6YQZbQwDrg=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/22
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;4&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;32586791717973114331655226011&quot;, oauth_timestamp=&quot;1655226011&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;%2BGygKhqQ96g8IPjQw6YQZbQwDrg%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;null&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;GET /apidemo/wp-json/wc/v3/products/22 HTTP/1.1&quot; 200 1121
+DEBUG    root:requestsUtilities.py:57 GET API response: {&#x27;id&#x27;: 22, &#x27;name&#x27;: &#x27;Long Sleeve Tee&#x27;, &#x27;slug&#x27;: &#x27;long-sleeve-tee&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/long-sleeve-tee/&#x27;, &#x27;date_created&#x27;: &#x27;2019-01-16T13:01:53&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2019-01-16T13:01:53&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T17:00:11&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T17:00:11&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&lt;p&gt;Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Vestibulum tortor quam, feugiat vitae, ultricies eget, tempor sit amet, ante. Donec eu libero sit amet quam egestas semper. Aenean ultricies mi vitae est. Mauris placerat eleifend leo.&lt;/p&gt;\n&#x27;, &#x27;short_description&#x27;: &#x27;&lt;p&gt;This is a simple product.&lt;/p&gt;\n&#x27;, &#x27;sku&#x27;: &#x27;woo-long-sleeve-tee&#x27;, &#x27;price&#x27;: &#x27;63.93&#x27;, &#x27;regular_price&#x27;: &#x27;63.93&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 1, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: 0, &#x27;download_expiry&#x27;: 0, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;1&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;7&#x27;, &#x27;width&#x27;: &#x27;5&#x27;, &#x27;height&#x27;: &#x27;1&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 22, &#x27;name&#x27;: &#x27;Tshirts&#x27;, &#x27;slug&#x27;: &#x27;tshirts&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [{&#x27;id&#x27;: 51, &#x27;date_created&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;date_modified&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2019-01-16T13:02:07&#x27;, &#x27;src&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-content/uploads/2019/01/long-sleeve-tee-2-1.jpg&#x27;, &#x27;name&#x27;: &#x27;long-sleeve-tee-2.jpg&#x27;, &#x27;alt&#x27;: &#x27;&#x27;}], &#x27;attributes&#x27;: [{&#x27;id&#x27;: 1, &#x27;name&#x27;: &#x27;color&#x27;, &#x27;position&#x27;: 0, &#x27;visible&#x27;: True, &#x27;variation&#x27;: False, &#x27;options&#x27;: [&#x27;Green&#x27;]}], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;63.93&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [12, 15, 32, 23], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/22&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}<br/></div></td></tr></tbody>
+      <tbody class="passed results-table-row">
+        <tr>
+          <td class="col-result">Passed</td>
+          <td class="col-name">test/products/test_update_product_regular_price.py::test_update_sale_price</td>
+          <td class="col-duration">3.87</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log"> -------------------------------Captured log call-------------------------------- <br/>DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [POST]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;108486567690030568831655226011&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226011&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=108486567690030568831655226011&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226011&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: POST&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D108486567690030568831655226011%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226011%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: yO8SHgMuy/gZf1erqnWYkmk8GIM=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;76&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;108486567690030568831655226011&quot;, oauth_timestamp=&quot;1655226011&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;yO8SHgMuy%2FgZf1erqnWYkmk8GIM%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;{&quot;name&quot;: &quot;cqjpzktyscvmqkqiwnhg&quot;, &quot;type&quot;: &quot;simple&quot;, &quot;regular_price&quot;: &quot;29.49&quot;}&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;POST /apidemo/wp-json/wc/v3/products HTTP/1.1&quot; 201 812
+DEBUG    root:requestsUtilities.py:39 POST API response: {&#x27;id&#x27;: 186, &#x27;name&#x27;: &#x27;cqjpzktyscvmqkqiwnhg&#x27;, &#x27;slug&#x27;: &#x27;cqjpzktyscvmqkqiwnhg&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/cqjpzktyscvmqkqiwnhg/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;29.49&#x27;, &#x27;regular_price&#x27;: &#x27;29.49&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;29.49&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [182, 166, 174, 59, 64], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [PUT]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;135107618909896917141655226012&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226012&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=135107618909896917141655226012&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226012&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: PUT&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts%2F186&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D135107618909896917141655226012%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226012%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: UpSwe444mDNTICMHFLlfjBemPuc=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;25&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;135107618909896917141655226012&quot;, oauth_timestamp=&quot;1655226012&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;UpSwe444mDNTICMHFLlfjBemPuc%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;{&quot;sale_price&quot;: &quot;22.1175&quot;}&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;PUT /apidemo/wp-json/wc/v3/products/186 HTTP/1.1&quot; 200 856
+DEBUG    root:requestsUtilities.py:74 PUT API response: {&#x27;id&#x27;: 186, &#x27;name&#x27;: &#x27;cqjpzktyscvmqkqiwnhg&#x27;, &#x27;slug&#x27;: &#x27;cqjpzktyscvmqkqiwnhg&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/cqjpzktyscvmqkqiwnhg/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T17:00:13&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T17:00:13&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;22.1175&#x27;, &#x27;regular_price&#x27;: &#x27;29.49&#x27;, &#x27;sale_price&#x27;: &#x27;22.1175&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: True, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;del aria-hidden=&quot;true&quot;&gt;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;29.49&lt;/bdi&gt;&lt;/span&gt;&lt;/del&gt; &lt;ins&gt;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;22.12&lt;/bdi&gt;&lt;/span&gt;&lt;/ins&gt;&#x27;, &#x27;related_ids&#x27;: [174, 166, 183, 181, 63], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [GET]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;94214404459622316531655226013&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226013&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=94214404459622316531655226013&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226013&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: GET&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts%2F186&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D94214404459622316531655226013%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226013%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: oID/burwXZ14izN7Unh+xjh24PU=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;4&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;94214404459622316531655226013&quot;, oauth_timestamp=&quot;1655226013&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;oID%2FburwXZ14izN7Unh%2Bxjh24PU%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;null&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;GET /apidemo/wp-json/wc/v3/products/186 HTTP/1.1&quot; 200 857
+DEBUG    root:requestsUtilities.py:57 GET API response: {&#x27;id&#x27;: 186, &#x27;name&#x27;: &#x27;cqjpzktyscvmqkqiwnhg&#x27;, &#x27;slug&#x27;: &#x27;cqjpzktyscvmqkqiwnhg&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/cqjpzktyscvmqkqiwnhg/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T17:00:13&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T17:00:13&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;22.1175&#x27;, &#x27;regular_price&#x27;: &#x27;29.49&#x27;, &#x27;sale_price&#x27;: &#x27;22.1175&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: True, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;del aria-hidden=&quot;true&quot;&gt;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;29.49&lt;/bdi&gt;&lt;/span&gt;&lt;/del&gt; &lt;ins&gt;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;22.12&lt;/bdi&gt;&lt;/span&gt;&lt;/ins&gt;&#x27;, &#x27;related_ids&#x27;: [185, 181, 178, 176, 182], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [PUT]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;84420385443780200141655226014&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226014&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=84420385443780200141655226014&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226014&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: PUT&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts%2F186&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D84420385443780200141655226014%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226014%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: KPtUv3gz2bE8t2wwi6Cg9ATvmOI=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;18&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;84420385443780200141655226014&quot;, oauth_timestamp=&quot;1655226014&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;KPtUv3gz2bE8t2wwi6Cg9ATvmOI%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;{&quot;sale_price&quot;: &quot;&quot;}&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;PUT /apidemo/wp-json/wc/v3/products/186 HTTP/1.1&quot; 200 813
+DEBUG    root:requestsUtilities.py:74 PUT API response: {&#x27;id&#x27;: 186, &#x27;name&#x27;: &#x27;cqjpzktyscvmqkqiwnhg&#x27;, &#x27;slug&#x27;: &#x27;cqjpzktyscvmqkqiwnhg&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/cqjpzktyscvmqkqiwnhg/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T17:00:14&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T17:00:14&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;29.49&#x27;, &#x27;regular_price&#x27;: &#x27;29.49&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;29.49&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [183, 59, 184, 182, 179], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:77 Signing request &lt;PreparedRequest [GET]&gt; using client &lt;Client client_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4, client_secret=****, resource_owner_key=None, resource_owner_secret=None, signature_method=HMAC-SHA1, signature_type=AUTH_HEADER, callback_uri=None, rsa_key=None, verifier=None, realm=None, encoding=utf-8, decoding=utf-8, nonce=None, timestamp=None&gt;
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:91 Including body in call to sign: False
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:171 Collected params: [(&#x27;oauth_nonce&#x27;, &#x27;53019413162404577081655226015&#x27;), (&#x27;oauth_timestamp&#x27;, &#x27;1655226015&#x27;), (&#x27;oauth_version&#x27;, &#x27;1.0&#x27;), (&#x27;oauth_signature_method&#x27;, &#x27;HMAC-SHA1&#x27;), (&#x27;oauth_consumer_key&#x27;, &#x27;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&#x27;)]
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:175 Normalized params: oauth_consumer_key=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&amp;oauth_nonce=53019413162404577081655226015&amp;oauth_signature_method=HMAC-SHA1&amp;oauth_timestamp=1655226015&amp;oauth_version=1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:176 Normalized URI: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:181 Signing: signature base string: GET&amp;http%3A%2F%2F192.168.0.31%3A8888%2Fapidemo%2Fwp-json%2Fwc%2Fv3%2Fproducts%2F186&amp;oauth_consumer_key%3Dck_e5df94f4a380812b14f6fb4f5943581117a45bd4%26oauth_nonce%3D53019413162404577081655226015%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1655226015%26oauth_version%3D1.0
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:188 Signature: Y6C/KBlNfBhUtYN/HnNAuxdyHPI=
+DEBUG    oauthlib.oauth1.rfc5849:__init__.py:358 Encoding URI, headers and body to utf-8.
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:114 Updated url: http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:115 Updated headers: {b&#x27;User-Agent&#x27;: b&#x27;python-requests/2.27.1&#x27;, b&#x27;Accept-Encoding&#x27;: b&#x27;gzip, deflate&#x27;, b&#x27;Accept&#x27;: b&#x27;*/*&#x27;, b&#x27;Connection&#x27;: b&#x27;keep-alive&#x27;, b&#x27;Content-Type&#x27;: b&#x27;application/json&#x27;, b&#x27;Content-Length&#x27;: b&#x27;4&#x27;, b&#x27;Authorization&#x27;: b&#x27;OAuth oauth_nonce=&quot;53019413162404577081655226015&quot;, oauth_timestamp=&quot;1655226015&quot;, oauth_version=&quot;1.0&quot;, oauth_signature_method=&quot;HMAC-SHA1&quot;, oauth_consumer_key=&quot;ck_e5df94f4a380812b14f6fb4f5943581117a45bd4&quot;, oauth_signature=&quot;Y6C%2FKBlNfBhUtYN%2FHnNAuxdyHPI%3D&quot;&#x27;}
+DEBUG    requests_oauthlib.oauth1_auth:oauth1_auth.py:116 Updated body: &#x27;null&#x27;
+DEBUG    urllib3.connectionpool:connectionpool.py:228 Starting new HTTP connection (1): 192.168.0.31:8888
+DEBUG    urllib3.connectionpool:connectionpool.py:456 http://192.168.0.31:8888 &quot;GET /apidemo/wp-json/wc/v3/products/186 HTTP/1.1&quot; 200 816
+DEBUG    root:requestsUtilities.py:57 GET API response: {&#x27;id&#x27;: 186, &#x27;name&#x27;: &#x27;cqjpzktyscvmqkqiwnhg&#x27;, &#x27;slug&#x27;: &#x27;cqjpzktyscvmqkqiwnhg&#x27;, &#x27;permalink&#x27;: &#x27;http://192.168.0.31:8888/apidemo/product/cqjpzktyscvmqkqiwnhg/&#x27;, &#x27;date_created&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_created_gmt&#x27;: &#x27;2022-06-14T17:00:12&#x27;, &#x27;date_modified&#x27;: &#x27;2022-06-14T17:00:14&#x27;, &#x27;date_modified_gmt&#x27;: &#x27;2022-06-14T17:00:14&#x27;, &#x27;type&#x27;: &#x27;simple&#x27;, &#x27;status&#x27;: &#x27;publish&#x27;, &#x27;featured&#x27;: False, &#x27;catalog_visibility&#x27;: &#x27;visible&#x27;, &#x27;description&#x27;: &#x27;&#x27;, &#x27;short_description&#x27;: &#x27;&#x27;, &#x27;sku&#x27;: &#x27;&#x27;, &#x27;price&#x27;: &#x27;29.49&#x27;, &#x27;regular_price&#x27;: &#x27;29.49&#x27;, &#x27;sale_price&#x27;: &#x27;&#x27;, &#x27;date_on_sale_from&#x27;: None, &#x27;date_on_sale_from_gmt&#x27;: None, &#x27;date_on_sale_to&#x27;: None, &#x27;date_on_sale_to_gmt&#x27;: None, &#x27;on_sale&#x27;: False, &#x27;purchasable&#x27;: True, &#x27;total_sales&#x27;: 0, &#x27;virtual&#x27;: False, &#x27;downloadable&#x27;: False, &#x27;downloads&#x27;: [], &#x27;download_limit&#x27;: -1, &#x27;download_expiry&#x27;: -1, &#x27;external_url&#x27;: &#x27;&#x27;, &#x27;button_text&#x27;: &#x27;&#x27;, &#x27;tax_status&#x27;: &#x27;taxable&#x27;, &#x27;tax_class&#x27;: &#x27;&#x27;, &#x27;manage_stock&#x27;: False, &#x27;stock_quantity&#x27;: None, &#x27;backorders&#x27;: &#x27;no&#x27;, &#x27;backorders_allowed&#x27;: False, &#x27;backordered&#x27;: False, &#x27;low_stock_amount&#x27;: None, &#x27;sold_individually&#x27;: False, &#x27;weight&#x27;: &#x27;&#x27;, &#x27;dimensions&#x27;: {&#x27;length&#x27;: &#x27;&#x27;, &#x27;width&#x27;: &#x27;&#x27;, &#x27;height&#x27;: &#x27;&#x27;}, &#x27;shipping_required&#x27;: True, &#x27;shipping_taxable&#x27;: True, &#x27;shipping_class&#x27;: &#x27;&#x27;, &#x27;shipping_class_id&#x27;: 0, &#x27;reviews_allowed&#x27;: True, &#x27;average_rating&#x27;: &#x27;0.00&#x27;, &#x27;rating_count&#x27;: 0, &#x27;upsell_ids&#x27;: [], &#x27;cross_sell_ids&#x27;: [], &#x27;parent_id&#x27;: 0, &#x27;purchase_note&#x27;: &#x27;&#x27;, &#x27;categories&#x27;: [{&#x27;id&#x27;: 15, &#x27;name&#x27;: &#x27;Uncategorized&#x27;, &#x27;slug&#x27;: &#x27;uncategorized&#x27;}], &#x27;tags&#x27;: [], &#x27;images&#x27;: [], &#x27;attributes&#x27;: [], &#x27;default_attributes&#x27;: [], &#x27;variations&#x27;: [], &#x27;grouped_products&#x27;: [], &#x27;menu_order&#x27;: 0, &#x27;price_html&#x27;: &#x27;&lt;span class=&quot;woocommerce-Price-amount amount&quot;&gt;&lt;bdi&gt;&lt;span class=&quot;woocommerce-Price-currencySymbol&quot;&gt;&amp;#36;&lt;/span&gt;29.49&lt;/bdi&gt;&lt;/span&gt;&#x27;, &#x27;related_ids&#x27;: [180, 178, 175, 61, 60], &#x27;meta_data&#x27;: [], &#x27;stock_status&#x27;: &#x27;instock&#x27;, &#x27;has_options&#x27;: False, &#x27;_links&#x27;: {&#x27;self&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products/186&#x27;}], &#x27;collection&#x27;: [{&#x27;href&#x27;: &#x27;http://192.168.0.31:8888/apidemo/wp-json/wc/v3/products&#x27;}]}}<br/></div></td></tr></tbody></table></body></html>

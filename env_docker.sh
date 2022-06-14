@@ -1,0 +1,9 @@
+
+export MACHINE=docker
+export WP_HOST=mamp
+
+export WC_KEY=ck_e5df94f4a380812b14f6fb4f5943581117a45bd4
+export WC_SECRET=cs_57b648248cdb80766f37e3c584dfc43211951886
+
+export DB_USER=root
+export DB_PASSWORD=root
